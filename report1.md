@@ -44,4 +44,73 @@ This project focuses on **message transmission** using **Blynk**, **Twilio**, an
 ---
 
 ## **5. Circuit Diagram**
-![Wiring Diagram](https://drive.usercontent.google.com/download?id=1sPbrtoW9kskKZEqlS0FZyknHI0w05ZPq&export=view&authuser=0)
+![Image](https://github.com/SiddharthKarmokar/ES-IOT/blob/main/display.png?raw=true)
+
+<p style="page-break-after: always;"></p>
+
+---
+
+## **6. Code**
+```python
+import blynklib
+from twilio.rest import Client
+from PIL import Image, ImageDraw, ImageFont
+import ST7735  # Updated to ST7735 for 1.8" SPI TFT
+import time
+import RPi.GPIO as GPIO
+
+# Blynk Auth Token
+BLYNK_AUTH = "YOUR_BLYNK_AUTH_TOKEN"
+blynk = blynklib.Blynk(BLYNK_AUTH)
+
+# Twilio Credentials
+ACCOUNT_SID = "YOUR_TWILIO_SID"
+AUTH_TOKEN = "YOUR_TWILIO_AUTH_TOKEN"
+TO_NUMBER = "+1234567890"
+FROM_NUMBER = "+0987654321"
+
+# LED Pin Setup
+LED_PIN = 17  # Change to your actual LED GPIO pin
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(LED_PIN, GPIO.OUT)
+
+def send_sms(message):
+    """Send message using Twilio"""
+    client = Client(ACCOUNT_SID, AUTH_TOKEN)
+    client.messages.create(to=TO_NUMBER, from_=FROM_NUMBER, body=message)
+    print("SMS sent!")
+
+def display_on_tft(message):
+    """Display message on SPI TFT LCD (ST7735)"""
+    disp = ST7735.ST7735(
+        port=0, cs=0, dc=25, backlight=18, rotation=180
+    )
+    disp.begin()
+    
+    img = Image.new("RGB", (128, 160), color=(0, 0, 0))  # Adjusted for 1.8" display resolution
+    draw = ImageDraw.Draw(img)
+    font = ImageFont.load_default()
+    
+    draw.text((10, 70), message, font=font, fill=(255, 255, 255))
+    disp.display(img)
+    print("Message displayed on TFT!")
+
+@blynk.on("V1")  # Virtual pin V1 for receiving messages
+def read_message(value):
+    message = value[0]
+    print(f"Received from Blynk: {message}")
+    
+    # Blink LED to indicate message received
+    GPIO.output(LED_PIN, GPIO.HIGH)
+    time.sleep(1)
+    GPIO.output(LED_PIN, GPIO.LOW)
+    
+    display_on_tft(message)
+    send_sms(message)
+
+print("Waiting for messages from Blynk...")
+while True:
+    blynk.run()
+    time.sleep(0.1)
+
+```
