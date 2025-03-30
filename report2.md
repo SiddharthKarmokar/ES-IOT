@@ -83,3 +83,90 @@ This project implements a **Morse code messaging system** using a **touch sensor
 
 ---
 
+## **5. Circuit Diagram**
+![Wiring Diagram](touch.png)
+
+---
+
+## **6. Code**
+```python
+import time
+import RPi.GPIO as GPIO
+import blynklib
+from twilio.rest import Client
+
+# Blynk Auth Token
+BLYNK_AUTH = "YOUR_BLYNK_AUTH_TOKEN"
+blynk = blynklib.Blynk(BLYNK_AUTH)
+
+# Twilio Credentials
+ACCOUNT_SID = "YOUR_TWILIO_SID"
+AUTH_TOKEN = "YOUR_TWILIO_AUTH_TOKEN"
+TO_NUMBER = "+1234567890"
+FROM_NUMBER = "+0987654321"
+
+# Touch Sensor Pin
+TOUCH_PIN = 4  # Change to actual GPIO pin
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(TOUCH_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+# Morse Code Dictionary
+MORSE_CODE = {
+    ".-": "A", "-...": "B", "-.-.": "C", "-..": "D", ".": "E", "..-.": "F", "--.": "G",
+    "....": "H", "..": "I", ".---": "J", "-.-": "K", ".-..": "L", "--": "M", "-.": "N",
+    "---": "O", ".--.": "P", "--.-": "Q", ".-.": "R", "...": "S", "-": "T", "..-": "U",
+    "...-": "V", ".--": "W", "-..-": "X", "-.--": "Y", "--..": "Z", "-----": "0",
+    ".----": "1", "..---": "2", "...--": "3", "....-": "4", ".....": "5", "-....": "6",
+    "--...": "7", "---..": "8", "----.": "9"
+}
+
+def send_sms(message):
+    """Send message using Twilio"""
+    client = Client(ACCOUNT_SID, AUTH_TOKEN)
+    client.messages.create(to=TO_NUMBER, from_=FROM_NUMBER, body=message)
+    print("SMS sent:", message)
+
+def send_to_blynk(message):
+    """Send message to Blynk app"""
+    blynk.virtual_write(1, message)
+    print("Message sent to Blynk:", message)
+
+def read_morse():
+    """Reads Morse code input from touch sensor"""
+    morse = ""
+    message = ""
+    last_press_time = None
+
+    while True:
+        if GPIO.input(TOUCH_PIN) == GPIO.LOW:
+            press_start = time.time()
+            while GPIO.input(TOUCH_PIN) == GPIO.LOW:
+                pass
+            press_duration = time.time() - press_start
+
+            if press_duration < 0.3:
+                morse += "."
+            else:
+                morse += "-"
+            last_press_time = time.time()
+            print("Current Morse:", morse)
+        
+        if last_press_time and time.time() - last_press_time > 1.5:
+            if morse in MORSE_CODE:
+                message += MORSE_CODE[morse]
+            morse = ""
+            print("Decoded so far:", message)
+        
+        if time.time() - last_press_time > 3:
+            if message:
+                send_sms(message)
+                send_to_blynk(message)
+                message = ""
+            last_press_time = None
+
+try:
+    print("Touch sensor Morse code input ready...")
+    read_morse()
+except KeyboardInterrupt:
+    GPIO.cleanup()
+```
